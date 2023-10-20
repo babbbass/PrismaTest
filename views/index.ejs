@@ -7,63 +7,112 @@
       type="text/javascript"
       src="https://www.gstatic.com/charts/loader.js"
     ></script>
-    <script type="text/javascript">
-        google.charts.load("current", { packages: ["corechart"] })
-        google.charts.setOnLoadCallback(drawChart)
-        google.charts.setOnLoadCallback(drawChartLongTask)
-
-        function drawChartLongTask() {
-        let data = new google.visualization.DataTable();
-
-        data.addColumn('string', 'Label 1');
-        data.addColumn('number', 'Temps en ms');
-
-        <% longTasks.forEach(function(item) { %>
-          data.addRow(['<%= item.fichier %>', <%= item.taskTime %>]);
-        <% }); %>
-
-        let options = {
-          hAxis: { title: 'Fichier', titleTextStyle: { color: '#333' } },
-          vAxis: { title: 'Temps en ms', titleTextStyle: { color: '#000' } }
-        };
-
-        let chart = new google.visualization.ColumnChart(document.getElementById('chart_longTask'));
-        chart.draw(data, options);
+    <style>
+      body {
+        margin: 0;
+        /* overflow: hidden; */
+      }
+      h1 {
+        color: #333;
+        font-size: 2rem;
+        padding-bottom: 2rem;
       }
 
-        function drawChart() {
-          let data = google.visualization.arrayToDataTable(
-            <%- JSON.stringify(chartData) %>
-          )
+      button {
+        padding: 8px;
+        border-radius: 6px;
+      }
 
-          let options = {
-            hAxis: { title: "Metric", titleTextStyle: { color: "#333" } },
-            vAxis: { title: "Temps en sec", titleTextStyle: { color: "#333" } },
-          }
+      td {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
 
-          let chart = new google.visualization.ColumnChart(
-            document.getElementById("chart_div")
-          )
-          chart.draw(data, options)
-        }
-    </script>
-  </head>
-  <body>
-    <h1>Résultats Page Speed pour <%= url %></h1>
-    <div
-      style="
+      #first_content {
         display: flex;
         align-items: center;
         flex-direction: column;
         width: 100%;
-      "
-    >
-      <h2>temps d'execution javascript</h2>
-      <div id="chart_div" style="width: 600px; height: 400px"></div>
-      <h2>tache longues</h2>
-      <div id="chart_longTask" style="width: 80%; height: 400px"></div>
-      <h2>fichier non caché</h2>
-      <table id="network_request" style="width: 80%">
+      }
+
+      #js_execution_time {
+        display: flex;
+        align-items: center;
+        width: 100%;
+      }
+
+      #long_tasks {
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        width: 100%;
+      }
+
+      #network_request {
+        width: 80%;
+        opacity: 0;
+        transition: opacity 0.5s ease;
+      }
+
+      #chart_longTask {
+        width: 80%;
+        height: 400px;
+        opacity: 0;
+        transition: opacity 0.8s ease;
+      }
+
+      .close_button_js {
+        cursor: pointer;
+      }
+
+      #chart_div {
+        width: 600px;
+        height: 400px;
+        opacity: 0;
+        transition: opacity 0.8s ease;
+      }
+
+      #other_data_container {
+        margin: 30px auto;
+        width: 80%;
+      }
+
+      #other_data {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Résultats Page Speed pour <%= url %></h1>
+    <div id="first_content">
+      <div id="js_execution_time">
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+            width: 100%;
+          "
+        >
+          <div>
+            <button id="jsExecution">temps d'execution javascript</button>
+            <span class="close_button_js">X</span>
+          </div>
+          <div id="chart_div"></div>
+        </div>
+        <!-- long task -->
+        <div id="long_tasks">
+          <button id="chart_longTask_button">tache longues</button>
+          <div id="chart_longTask"></div>
+        </div>
+      </div>
+      <!-- file not cached -->
+      <button id="file_not_cached">fichier non caché</button>
+      <table id="network_request">
         <thead>
           <tr>
             <th>Fichier</th>
@@ -71,24 +120,161 @@
             <th>type</th>
           </tr>
         </thead>
-        <tbody>
-          <% networkRequestsElements.forEach(function(element) { %>
-          <tr>
-            <td
-              style="
-                max-width: 200px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-              "
-            >
-              <%= element.fichier %>
-            </td>
-            <td><%= element.TempsRequete %></td>
-            <td><%= element.type %></td>
-          </tr>
-          <% }); %>
-        </tbody>
+        <tbody id="network_request_body"></tbody>
       </table>
+
+      <div id="other_data_container">
+        <button>Autres data</button>
+        <div id="other_data">
+          <div class="other_data">
+            <h4>First content</h4>
+            <%- JSON.stringify(data["first-contentful-paint"].displayValue) %>
+          </div>
+          <div class="other_data">
+            <h4>Total temps bloquant</h4>
+            <%- JSON.stringify(data["total-blocking-time"].displayValue) %>
+          </div>
+          <div class="other_data">
+            <h4>largest content</h4>
+            <%- JSON.stringify(data["largest-contentful-paint"].displayValue) %>
+          </div>
+        </div>
+      </div>
     </div>
+    <script>
+      document.querySelector(".close_button_js").addEventListener("click", () => {
+        document.querySelector("#chart_div").style.opacity = 0
+      })
+      google.charts.load("current", { packages: ["corechart"] })
+      const executionTimeStore = []
+      const getTimeToRequest = () => {
+        const date = new Date()
+
+        const mois = (date.getMonth() + 1).toString().padStart(2, "0")
+        const jour = date.getDate().toString().padStart(2, "0")
+        const heure = date.getHours().toString().padStart(2, "0")
+        const minutes = date.getMinutes().toString().padStart(2, "0")
+
+        const time = `${mois}-${jour} ${heure}:${minutes}`
+
+        return time
+      }
+      // request API
+      const apiData = <%- JSON.stringify(data) %>;
+
+      const fetchJsTimeExecution = (data) => {
+
+        const REGEX = /[A-Z]/i
+        let executionJsTime = data["bootup-time"].displayValue
+        executionJsTime = Number(executionJsTime.replace(REGEX, ""))
+
+        return executionJsTime
+      }
+      // display loading JS file
+      document.querySelector("#jsExecution").addEventListener("click", () => {
+        const jsTimeExecution = fetchJsTimeExecution(apiData)
+        const idApi = getTimeToRequest()
+
+        executionTimeStore.push({ id: idApi, time: jsTimeExecution })
+        // Créer les données Google Chart
+        const chartData = executionTimeStore.map((jsTime) => [
+          jsTime.id,
+          jsTime.time,
+        ])
+        chartData.unshift(["Par Seb", "Javascript"])
+        console.log(chartData)
+
+        let chartDiv = document.querySelector("#chart_div")
+          chartDiv.style.opacity = 1
+          //chartDiv.style.display = 'block'
+          //chartDiv.style.transform = "translateY(0)"
+        google.charts.setOnLoadCallback(drawChart)
+
+        function drawChart() {
+          let googleData = google.visualization.arrayToDataTable(
+            chartData
+          )
+
+          let options = {
+            hAxis: { title: "Metric", titleTextStyle: { color: "#333" } },
+            vAxis: { title: "Temps en sec", titleTextStyle: { color: "#333" } },
+          }
+
+          let chart = new google.visualization.ColumnChart(chartDiv)
+
+          chart.draw(googleData, options)
+        }
+
+      })
+      // display file not cached
+      document.querySelector("#file_not_cached").addEventListener("click", () => {
+        // file network request
+        const tableBody = document.querySelector("#network_request_body");
+        const table = document.querySelector("#network_request");
+        table.style.opacity = 1
+        const networkRequests = apiData["network-requests"].details.items
+        const networkRequestsElements = []
+        for (const request of networkRequests) {
+          const element = {
+            fichier: request.url,
+            TempsRequete: request.networkRequestTime,
+            type: request.resourceType,
+          }
+
+          networkRequestsElements.push(element)
+        }
+
+        networkRequestsElements.forEach((item) => {
+          const row = tableBody.insertRow(-1);
+            const cell1 = row.insertCell(0);
+            const cell2 = row.insertCell(1);
+            const cell3 = row.insertCell(2);
+
+            cell1.innerHTML = item.fichier;
+            cell2.innerHTML = item.TempsRequete;
+            cell3.innerHTML = item.type;
+
+        })
+      })
+      // display long task
+      document.querySelector("#chart_longTask_button").addEventListener("click", () => {
+        const longTask = apiData["long-tasks"].details.items
+        const longTasks = []
+
+        for (const task of longTask) {
+          const element = {
+            fichier: task.url,
+            taskTime: task.duration,
+          }
+
+          longTasks.push(element)
+        }
+
+        google.charts.load("current", { packages: ["corechart"] })
+        google.charts.setOnLoadCallback(drawChartLongTask)
+
+        function drawChartLongTask() {
+        let dataGoogle = new google.visualization.DataTable();
+
+        dataGoogle.addColumn('string', 'Label 1');
+        dataGoogle.addColumn('number', 'Temps en ms');
+
+        longTasks.forEach(function(item) {
+          dataGoogle.addRow([item.fichier, item.taskTime]);
+        });
+
+        let options = {
+          hAxis: { title: 'Fichier', titleTextStyle: { color: '#333' } },
+          vAxis: { title: 'Temps en ms', titleTextStyle: { color: '#000' } }
+        };
+
+        const longTaskTable = document.querySelector('#chart_longTask')
+        longTaskTable.style.opacity = 1
+        let chart = new google.visualization.ColumnChart(longTaskTable);
+        chart.draw(dataGoogle, options);
+
+      }
+      })
+    </script>
   </body>
 </html>
