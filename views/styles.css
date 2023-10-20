@@ -1,0 +1,19 @@
+body {
+  margin: auto;
+  display: flex;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+h1 {
+  color: aquamarine;
+}
+
+#network_request {
+  width: 500px;
+}
+
+
+

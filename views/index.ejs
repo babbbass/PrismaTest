@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="./styles.css" />
+    <title>Résultats Page Speed Insight</title>
+    <script
+      type="text/javascript"
+      src="https://www.gstatic.com/charts/loader.js"
+    ></script>
+    <script type="text/javascript">
+        google.charts.load("current", { packages: ["corechart"] })
+        google.charts.setOnLoadCallback(drawChart)
+        google.charts.setOnLoadCallback(drawChartLongTask)
+
+        function drawChartLongTask() {
+        let data = new google.visualization.DataTable();
+
+        data.addColumn('string', 'Label 1');
+        data.addColumn('number', 'Temps en ms');
+
+        <% longTasks.forEach(function(item) { %>
+          data.addRow(['<%= item.fichier %>', <%= item.taskTime %>]);
+        <% }); %>
+
+        let options = {
+          hAxis: { title: 'Fichier', titleTextStyle: { color: '#333' } },
+          vAxis: { title: 'Temps en ms', titleTextStyle: { color: '#000' } }
+        };
+
+        let chart = new google.visualization.ColumnChart(document.getElementById('chart_longTask'));
+        chart.draw(data, options);
+      }
+
+        function drawChart() {
+          let data = google.visualization.arrayToDataTable(
+            <%- JSON.stringify(chartData) %>
+          )
+
+          let options = {
+            hAxis: { title: "Metric", titleTextStyle: { color: "#333" } },
+            vAxis: { title: "Temps en sec", titleTextStyle: { color: "#333" } },
+          }
+
+          let chart = new google.visualization.ColumnChart(
+            document.getElementById("chart_div")
+          )
+          chart.draw(data, options)
+        }
+    </script>
+  </head>
+  <body>
+    <h1>Résultats Page Speed pour <%= url %></h1>
+    <div
+      style="
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        width: 100%;
+      "
+    >
+      <h2>temps d'execution javascript</h2>
+      <div id="chart_div" style="width: 600px; height: 400px"></div>
+      <h2>tache longues</h2>
+      <div id="chart_longTask" style="width: 80%; height: 400px"></div>
+      <h2>fichier non caché</h2>
+      <table id="network_request" style="width: 80%">
+        <thead>
+          <tr>
+            <th>Fichier</th>
+            <th>tps requete</th>
+            <th>type</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% networkRequestsElements.forEach(function(element) { %>
+          <tr>
+            <td
+              style="
+                max-width: 200px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              "
+            >
+              <%= element.fichier %>
+            </td>
+            <td><%= element.TempsRequete %></td>
+            <td><%= element.type %></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>
